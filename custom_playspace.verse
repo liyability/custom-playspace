@@ -1,6 +1,6 @@
 <#> AUTHOR: Jonathon D. Phillips
         Twitter/X: LiyabilityJP
-        Discord/Twitch/GitHub/Epic: syntaxErr0rz
+        Discord/Twitch/GitHub/Epic: Liyability
         Organization: Reliyability Software LLC
 
 <#> CONTRIBUTORS: []
