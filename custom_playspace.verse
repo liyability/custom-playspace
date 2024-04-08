@@ -52,6 +52,7 @@ custom_playspace := class<concrete>:
     @editable{ ToolTip := PulseRateToolTip }
     PULSE_CHECK_RATE: float = 0.5
 
+    # STORED PLAYSPACE AFTER INIT
     var MaybePlayspace<private>: ?fort_playspace = false
 
     # MAINTAINED ARRAY OF PLAYERS IN PLAYSPACE
@@ -106,7 +107,7 @@ custom_playspace := class<concrete>:
                 for (Player : Self.PlayspacePlayers). Player.MaybeHandleLeaveInProgress()
 
     # GETTERS
-    GetAgents(): []agent =
+    GetAgents()<transacts>: []agent =
         var Agents: []agent = array{}
         for (Player : Self.PlayspacePlayers, Agent := agent[Player]). set Agents += array{ Agent }
         Agents
@@ -124,7 +125,7 @@ custom_playspace := class<concrete>:
         Team := TeamCollection.GetTeams()[InTeamIndex]
         TeamCollection.GetAgents[Team]
 
-    GetFortCharacters(): []fort_character =
+    GetFortCharacters()<transacts>: []fort_character =
         var FortCharacters: []fort_character = array{}
         for (Player : Self.PlayspacePlayers, FortCharacter := Player.GetFortCharacter[]). set FortCharacters += array{ FortCharacter }
         FortCharacters
