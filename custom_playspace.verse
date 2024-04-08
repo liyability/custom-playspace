@@ -170,9 +170,16 @@ custom_playspace := class<concrete>:
 
     (InFortCharacter: fort_character).MonitorMovementLoop<private>(InAgent: agent)<suspends>: void =
         OriginalTranslation := InFortCharacter.GetTransform().Translation
+        OriginalX := OriginalTranslation.X
+        OriginalY := OriginalTranslation.Y
+        OriginalZ := OriginalTranslation.Z
         loop:
-            Sleep(0.01)
-            if (Distance(InFortCharacter.GetTransform().Translation, OriginalTranslation) <> 0.0). break
+            Sleep(0.25)
+            CurrentTranslation := InFortCharacter.GetTransform().Translation
+            CurrentX := CurrentTranslation.X
+            CurrentY := CurrentTranslation.Y
+            CurrentZ := CurrentTranslation.Z
+            if ((OriginalX <> CurrentX) or (OriginalY <> CurrentY) or (OriginalZ <> CurrentZ)). break
         InAgent.HandleJoinInProgress()
 
     (InPlayerSpawner: player_spawner_device).HandleJoinInProgressLoop<private>()<suspends>: void =
