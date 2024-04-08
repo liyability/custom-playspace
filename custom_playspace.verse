@@ -100,7 +100,7 @@ custom_playspace := class<concrete>:
                 else. break
             loop:
                 Sleep(Self.PULSE_CHECK_RATE)
-                for (Agent : Self.PlayspacePlayers). Agent.MaybeHandleLeaveInProgress()
+                for (Player : Self.PlayspacePlayers). Player.MaybeHandleLeaveInProgress()
 
     # GETTERS
     GetAgents(): []agent =
@@ -148,20 +148,25 @@ custom_playspace := class<concrete>:
             if (JoinInProgressTrigger := MaybeJoinInProgressTrigger?). JoinInProgressTrigger.Trigger(InAgent)
 
     (InAgent: agent).MaybeHandleJoinInProgress<private>(): void =
-        if (not Self.PlayspacePlayers.Find[InAgent]). InAgent.HandleJoinInProgress()
+        if:
+            InPlayer := player[InAgent]
+            InPlayer.IsActive[]
+            not Self.PlayspacePlayers.Find[InAgent]
+        then:
+            InAgent.HandleJoinInProgress()
 
     (InAgent: agent).MaybeHandleJoinInProgressAfterMovement<private>(): void =
         if (not Self.PlayspacePlayers.Find[InAgent]):
             if (InFortCharacter := InAgent.GetFortCharacter[]):
                 spawn{ InFortCharacter.MonitorMovementLoop(InAgent) }
 
-    (InAgent: agent).HandleLeaveInProgress<private>(): void =
-        Self.PlayspacePlayers.RemoveAllElements(InAgent)
-        Self.LeaveInProgressEvent.Signal(InAgent)
-        if (LeaveInProgressTrigger := MaybeLeaveInProgressTrigger?). LeaveInProgressTrigger.Trigger(InAgent)
+    (InPlayer: player).HandleLeaveInProgress<private>(): void =
+        Self.PlayspacePlayers.RemoveAllElements(InPlayer)
+        Self.LeaveInProgressEvent.Signal(InPlayer)
+        if (LeaveInProgressTrigger := MaybeLeaveInProgressTrigger?). LeaveInProgressTrigger.Trigger(InPlayer)
 
     (InAgent: agent).MaybeHandleLeaveInProgress<private>(): void =
-        if (InPlayer := player[InAgent], not InPlayer.IsActive[]). InAgent.HandleLeaveInProgress()
+        if (InPlayer := player[InAgent], not InPlayer.IsActive[]). InPlayer.HandleLeaveInProgress()
 
     (InFortCharacter: fort_character).MonitorMovementLoop<private>(InAgent: agent)<suspends>: void =
         OriginalTranslation := InFortCharacter.GetTransform().Translation
