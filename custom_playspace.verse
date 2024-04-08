@@ -52,6 +52,8 @@ custom_playspace := class<concrete>:
     @editable{ ToolTip := PulseRateToolTip }
     PULSE_CHECK_RATE: float = 0.5
 
+    var MaybePlayspace<private>: ?fort_playspace = false
+
     # MAINTAINED ARRAY OF AGENTS IN PLAYSPACE
     var PlayspacePlayers<private>: []player = array{}
 
@@ -65,6 +67,7 @@ custom_playspace := class<concrete>:
 
     InitLoop(InCreativeDevice: creative_device)<suspends>: void =
         Playspace := InCreativeDevice.GetPlayspace()
+        set Self.MaybePlayspace = option{ Playspace }
 
         # JOIN IN PROGRESS CHECKS
         for (Player : Playspace.GetPlayers()). Player.MaybeHandleJoinInProgress()
@@ -108,8 +111,16 @@ custom_playspace := class<concrete>:
         for (Player : Self.PlayspacePlayers, Agent := agent[Player]). set Agents += array{ Agent }
         Agents
 
-    GetAgentsByTeamIndex(InTeamIndex: int, InCreativeDevice: creative_device)<transacts><decides>: []agent =
-        TeamCollection := InCreativeDevice.GetPlayspace().GetTeamCollection()
+    GetAgentsByTeam(InTeam: team)<transacts><decides>: []agent =
+        var AgentsOnTeam: []agent = array{}
+        if (Playspace := Self.MaybePlayspace?):
+            for (Agent : Playspace.GetTeamCollection().GetAgents[InTeam]):
+                set AgentsOnTeam += array{ Agent }
+        AgentsOnTeam
+
+    GetAgentsByTeamIndex(InTeamIndex: int)<transacts><decides>: []agent =
+        Playspace := Self.MaybePlayspace?
+        TeamCollection := Playspace.GetTeamCollection()
         Team := TeamCollection.GetTeams()[InTeamIndex]
         TeamCollection.GetAgents[Team]
 
@@ -118,27 +129,34 @@ custom_playspace := class<concrete>:
         for (Player : Self.PlayspacePlayers, FortCharacter := Player.GetFortCharacter[]). set FortCharacters += array{ FortCharacter }
         FortCharacters
 
-    GetPlayers(): []player = Self.PlayspacePlayers
+    GetPlayers()<transacts>: []player = Self.PlayspacePlayers
 
-    GetTeamCollection(InCreativeDevice: creative_device): fort_team_collection = InCreativeDevice.GetPlayspace().GetTeamCollection() 
+    GetTeamCollection()<transacts><decides>: fort_team_collection =
+        Playspace := Self.MaybePlayspace?
+        Playspace.GetTeamCollection() 
 
-    GetTeams(InCreativeDevice: creative_device): []team = InCreativeDevice.GetPlayspace().GetTeamCollection().GetTeams()
+    GetTeams()<transacts><decides>: []team =
+        Playspace := Self.MaybePlayspace?
+        Playspace.GetTeamCollection().GetTeams()
 
-    GetTeamByAgent(InAgent: agent, InCreativeDevice: creative_device)<transacts><decides>: team =
-        InCreativeDevice.GetPlayspace().GetTeamCollection().GetTeam[InAgent]
+    GetTeamByAgent(InAgent: agent)<transacts><decides>: team =
+        Playspace := Self.MaybePlayspace?
+        Playspace.GetTeamCollection().GetTeam[InAgent]
 
-    GetTeamByFortCharacter(InFortCharacter: fort_character, InCreativeDevice: creative_device)<transacts><decides>: team =
+    GetTeamByFortCharacter(InFortCharacter: fort_character)<transacts><decides>: team =
         InAgent := InFortCharacter.GetAgent[]
-        GetTeamByAgent[InAgent, InCreativeDevice]
+        GetTeamByAgent[InAgent]
 
     # METHODS
-    AddToTeamWithIndex(InAgent: agent, InTeamIndex: int, InCreativeDevice: creative_device)<transacts><decides>: void =
-        Team := Self.GetTeamByAgent[InAgent, InCreativeDevice]
-        InCreativeDevice.GetPlayspace().GetTeamCollection().AddToTeam[InAgent, Team]
+    AddToTeamWithIndex(InAgent: agent, InTeamIndex: int)<transacts><decides>: void =
+        Playspace := Self.MaybePlayspace?
+        Team := Self.GetTeamByAgent[InAgent]
+        Playspace.GetTeamCollection().AddToTeam[InAgent, Team]
 
-    IsOnTeamWithIndex(InAgent: agent, InTeamIndex: int, InCreativeDevice: creative_device)<transacts><decides>: void =
-        Team := Self.GetTeamByAgent[InAgent, InCreativeDevice]
-        InCreativeDevice.GetPlayspace().GetTeamCollection().IsOnTeam[InAgent, Team]
+    IsOnTeamWithIndex(InAgent: agent, InTeamIndex: int)<transacts><decides>: void =
+        Playspace := Self.MaybePlayspace?
+        Team := Self.GetTeamByAgent[InAgent]
+        Playspace.GetTeamCollection().IsOnTeam[InAgent, Team]
 
     # INTERNAL EXTENSION METHODS
     (InAgent: agent).HandleJoinInProgress<private>(): void =
