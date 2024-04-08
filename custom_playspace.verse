@@ -113,9 +113,9 @@ custom_playspace := class<concrete>:
 
     GetAgentsByTeam(InTeam: team)<transacts><decides>: []agent =
         var AgentsOnTeam: []agent = array{}
-        if (Playspace := Self.MaybePlayspace?):
-            for (Agent : Playspace.GetTeamCollection().GetAgents[InTeam]):
-                set AgentsOnTeam += array{ Agent }
+        Playspace := Self.MaybePlayspace?
+        for (Agent : Playspace.GetTeamCollection().GetAgents[InTeam]):
+            set AgentsOnTeam += array{ Agent }
         AgentsOnTeam
 
     GetAgentsByTeamIndex(InTeamIndex: int)<transacts><decides>: []agent =
