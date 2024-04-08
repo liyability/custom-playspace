@@ -66,7 +66,7 @@ custom_playspace := class<concrete>:
     # INIT FUNCTIONALITY
     Init(InCreativeDevice: creative_device): void = spawn{ Self.InitLoop(InCreativeDevice) }
 
-    InitLoop(InCreativeDevice: creative_device)<suspends>: void =
+    InitLoop<private>(InCreativeDevice: creative_device)<suspends>: void =
         Playspace := InCreativeDevice.GetPlayspace()
         set Self.MaybePlayspace = option{ Playspace }
 
