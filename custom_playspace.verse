@@ -54,7 +54,7 @@ custom_playspace := class<concrete>:
 
     var MaybePlayspace<private>: ?fort_playspace = false
 
-    # MAINTAINED ARRAY OF AGENTS IN PLAYSPACE
+    # MAINTAINED ARRAY OF PLAYERS IN PLAYSPACE
     var PlayspacePlayers<private>: []player = array{}
 
     # CUSTOM EVENTS
