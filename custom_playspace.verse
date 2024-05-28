@@ -180,7 +180,7 @@ custom_playspace := class<concrete>:
                 spawn{ InFortCharacter.MonitorMovementLoop(InAgent) }
 
     (InPlayer: player).HandleLeaveInProgress<private>(): void =
-        Self.PlayspacePlayers.RemoveAllElements(InPlayer)
+        set Self.PlayspacePlayers = Self.PlayspacePlayers.RemoveAllElements(InPlayer)
         Self.LeaveInProgressEvent.Signal(InPlayer)
         if (LeaveInProgressTrigger := MaybeLeaveInProgressTrigger?). LeaveInProgressTrigger.Trigger(InPlayer)
 
