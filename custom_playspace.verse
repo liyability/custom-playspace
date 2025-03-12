@@ -5,7 +5,6 @@
 
 <#> CONTRIBUTORS: []
 
-# IMPORTS
 using { /Fortnite.com/Characters }
 using { /Fortnite.com/Devices }
 using { /Fortnite.com/Playspaces }
@@ -14,116 +13,44 @@ using { /Verse.org/Simulation }
 using { /UnrealEngine.com/Temporary/Diagnostics }
 using { /UnrealEngine.com/Temporary/SpatialMath }
 
-# TOOLTIPS
-MaybePlayerCounterToolTip<localizes>: message = "Player counter must include spectators and cannot use volume"
+PlayerCounterToolTip<localizes>: message = "Player counter must include spectators and cannot use volume"
 
-MaybeJoinInProgressTriggerToolTip<localizes>: message = "You can add a trigger to pass join in progress agents to other devices"
-
-MaybeLeaveInProgressTriggerToolTip<localizes>: message = "You can add a trigger to pass leave in progress agents to other devices"
-
-PulseRateToolTip<localizes>: message = "PULSE_RATE is the rate in which the Playspace is scraped for join/leave in progress Agents"
-
-# CUSTOM CONCRETE CLASS
 custom_playspace := class<concrete>:
+    @editable{ ToolTip := PlayerCounterToolTip }
+    PlayerCounter: player_counter_device = player_counter_device{}
 
-    # OPTIONAL EDITABLES
-    @editable
-    MaybePlayerSpawners: ?[]player_spawner_device = false
-
-    @editable
-    MaybeTeamSettingsDevices: ?[]team_settings_and_inventory_device = false
-
-    @editable{ ToolTip := MaybePlayerCounterToolTip }
-    MaybePlayerCounter: ?player_counter_device = false
-
-    @editable
-    MaybeMutatorZone: ?mutator_zone_device = false
-
-    @editable
-    MaybeVolumeDevice: ?volume_device = false
-
-    @editable{ ToolTip := MaybeJoinInProgressTriggerToolTip }
-    MaybeJoinInProgressTrigger: ?trigger_device = false
-
-    @editable{ ToolTip := MaybeLeaveInProgressTriggerToolTip }
-    MaybeLeaveInProgressTrigger: ?trigger_device = false
-
-    # CONFIGURABLE PULSE CHECK RATE
-    @editable{ ToolTip := PulseRateToolTip }
-    PULSE_CHECK_RATE: float = 0.5
-
-    # STORED PLAYSPACE AFTER INIT
     var MaybePlayspace<private>: ?fort_playspace = false
-
-    # MAINTAINED ARRAY OF PLAYERS IN PLAYSPACE
     var PlayspacePlayers<private>: []player = array{}
 
-    # CUSTOM EVENTS
-    JoinInProgressEvent: event(agent) = event(agent){}
+    JoinInProgressEvent: event(player) = event(player){}
+    LeaveInProgressEvent: event(player) = event(player){}
 
-    LeaveInProgressEvent: event(agent) = event(agent){}
-
-    # INIT FUNCTIONALITY
     Init(InCreativeDevice: creative_device): void = spawn{ Self.InitLoop(InCreativeDevice) }
 
     InitLoop<private>(InCreativeDevice: creative_device)<suspends>: void =
         Playspace := InCreativeDevice.GetPlayspace()
-        set Self.MaybePlayspace = option{ Playspace }
+        set Self.MaybePlayspace = option. Playspace
 
-        # JOIN IN PROGRESS CHECKS
-        for (Player : Playspace.GetPlayers()). Player.MaybeHandleJoinInProgress()
-        if (PlayerSpawners := Self.MaybePlayerSpawners?):
-            for (PlayerSpawner : PlayerSpawners). spawn{ PlayerSpawner.HandleJoinInProgressLoop() }
-        if (TeamSettingsDevices := Self.MaybeTeamSettingsDevices?):
-            for (TeamSettingsDevice : TeamSettingsDevices). spawn{ TeamSettingsDevice.HandleJoinInProgressLoop() }
+        for (Player : Playspace.GetPlayers()). Player.HandleJoinInProgress()
+
         sync:
-            loop:
-                Playspace.PlayerAddedEvent().Await().MaybeHandleJoinInProgress()
-            loop:
-                Sleep(Self.PULSE_CHECK_RATE)
-                for (Player : Playspace.GetPlayers()):
-                    if (Agent := agent[Player]). Agent.MaybeHandleJoinInProgress()
-            loop:
-                if (PlayerCounter := Self.MaybePlayerCounter?):
-                    PlayerCounter.CountedEvent.Await().MaybeHandleJoinInProgressAfterMovement()
-                else. break
-            loop:
-                if (MutatorZone := Self.MaybeMutatorZone?):
-                    MutatorZone.AgentEntersEvent.Await().MaybeHandleJoinInProgress()
-                else. break
-            loop:
-                if (VolumeDevice := Self.MaybeVolumeDevice?):
-                    VolumeDevice.AgentEntersEvent.Await().MaybeHandleJoinInProgress()
-                else. break
-            # LEAVE IN PROGRESS CHECKS
-            loop:
-                Playspace.PlayerRemovedEvent().Await().MaybeHandleLeaveInProgress()
-            loop:
-                if (PlayerCounter := Self.MaybePlayerCounter?):
-                    PlayerCounter.RemovedEvent.Await().MaybeHandleLeaveInProgress()
-                else. break
-            loop:
-                Sleep(Self.PULSE_CHECK_RATE)
-                for (Player : Self.PlayspacePlayers). Player.MaybeHandleLeaveInProgress()
+            loop. Self.PlayerCounter.CountedEvent.Await().MaybeHandleJoinInProgressAfterMovement()
+            loop. Self.PlayerCounter.RemovedEvent.Await().MaybeHandleLeaveInProgress()
 
-    # GETTERS
-    GetAgents()<transacts>: []agent =
-        var Agents: []agent = array{}
-        for (Player : Self.PlayspacePlayers, Agent := agent[Player]). set Agents += array{ Agent }
-        Agents
+    GetActivePlayer<public>()<transacts><decides>: player =
+        var MaybeActivePlayer: ?player = false
+        for (Player : Self.GetPlayers(), Player.IsActive[]). set MaybeActivePlayer = option. Player
+        MaybeActivePlayer?
 
-    GetAgentsByTeam(InTeam: team)<transacts><decides>: []agent =
-        var AgentsOnTeam: []agent = array{}
-        Playspace := Self.MaybePlayspace?
-        for (Agent : Playspace.GetTeamCollection().GetAgents[InTeam]):
-            set AgentsOnTeam += array{ Agent }
-        AgentsOnTeam
+    GetActivePlayerByTeamIndex<public>(InIndex: int)<transacts><decides>: []player =
+        Self.GetActivePlayersByTeamIndex[0]
 
-    GetAgentsByTeamIndex(InTeamIndex: int)<transacts><decides>: []agent =
+    GetActivePlayersByTeamIndex<public>(InTeamIndex: int)<transacts><decides>: []player =
         Playspace := Self.MaybePlayspace?
         TeamCollection := Playspace.GetTeamCollection()
         Team := TeamCollection.GetTeams()[InTeamIndex]
-        TeamCollection.GetAgents[Team]
+        AgentsOnTeam := TeamCollection.GetAgents[Team]
+        for (Agent : AgentsOnTeam, Player := player[Agent], Player.IsActive[]). Player 
 
     GetFortCharacters()<transacts>: []fort_character =
         var FortCharacters: []fort_character = array{}
@@ -131,6 +58,13 @@ custom_playspace := class<concrete>:
         FortCharacters
 
     GetPlayers()<transacts>: []player = Self.PlayspacePlayers
+
+    GetPlayersByTeamIndex(InTeamIndex: int)<transacts><decides>: []player =
+        Playspace := Self.MaybePlayspace?
+        TeamCollection := Playspace.GetTeamCollection()
+        Team := TeamCollection.GetTeams()[InTeamIndex]
+        AgentsOnTeam := TeamCollection.GetAgents[Team]
+        for (Agent : AgentsOnTeam). player[Agent]
 
     GetTeamCollection()<transacts><decides>: fort_team_collection =
         Playspace := Self.MaybePlayspace?
@@ -144,11 +78,13 @@ custom_playspace := class<concrete>:
         Playspace := Self.MaybePlayspace?
         Playspace.GetTeamCollection().GetTeam[InAgent]
 
+    GetTeamByIndex(InIndex: int)<transacts><decides>: team =
+        Self.GetTeams[][InIndex]
+
     GetTeamByFortCharacter(InFortCharacter: fort_character)<transacts><decides>: team =
         InAgent := InFortCharacter.GetAgent[]
         GetTeamByAgent[InAgent]
 
-    # METHODS
     AddToTeamWithIndex(InAgent: agent, InTeamIndex: int)<transacts><decides>: void =
         Playspace := Self.MaybePlayspace?
         Team := Self.GetTeamByAgent[InAgent]
@@ -156,15 +92,16 @@ custom_playspace := class<concrete>:
 
     IsOnTeamWithIndex(InAgent: agent, InTeamIndex: int)<transacts><decides>: void =
         Playspace := Self.MaybePlayspace?
-        Team := Self.GetTeamByAgent[InAgent]
-        Playspace.GetTeamCollection().IsOnTeam[InAgent, Team]
+        TeamCollection := Playspace.GetTeamCollection()
+        Teams := Playspace.GetTeamCollection().GetTeams()
+        TeamByIndex := Teams[InTeamIndex]
+        TeamCollection.IsOnTeam[InAgent, TeamByIndex]
 
-    # INTERNAL EXTENSION METHODS
     (InAgent: agent).HandleJoinInProgress<private>(): void =
         if (InPlayer := player[InAgent]):
+            Self.PlayspacePlayers.RemoveAllElements(InPlayer)
             set Self.PlayspacePlayers += array{ InPlayer }
-            Self.JoinInProgressEvent.Signal(InAgent)
-            if (JoinInProgressTrigger := MaybeJoinInProgressTrigger?). JoinInProgressTrigger.Trigger(InAgent)
+            Self.JoinInProgressEvent.Signal(InPlayer)
 
     (InAgent: agent).MaybeHandleJoinInProgress<private>(): void =
         if:
@@ -172,20 +109,15 @@ custom_playspace := class<concrete>:
             InPlayer.IsActive[]
             not Self.PlayspacePlayers.Find[InAgent]
         then:
-            InAgent.HandleJoinInProgress()
+            InPlayer.HandleJoinInProgress()
 
     (InAgent: agent).MaybeHandleJoinInProgressAfterMovement<private>(): void =
         if (not Self.PlayspacePlayers.Find[InAgent]):
             if (InFortCharacter := InAgent.GetFortCharacter[]):
                 spawn{ InFortCharacter.MonitorMovementLoop(InAgent) }
 
-    (InPlayer: player).HandleLeaveInProgress<private>(): void =
-        set Self.PlayspacePlayers = Self.PlayspacePlayers.RemoveAllElements(InPlayer)
-        Self.LeaveInProgressEvent.Signal(InPlayer)
-        if (LeaveInProgressTrigger := MaybeLeaveInProgressTrigger?). LeaveInProgressTrigger.Trigger(InPlayer)
-
     (InAgent: agent).MaybeHandleLeaveInProgress<private>(): void =
-        if (InPlayer := player[InAgent], not InPlayer.IsActive[]). InPlayer.HandleLeaveInProgress()
+        if (InPlayer := player[InAgent]). spawn. InPlayer.HandleLeaveInProgress()
 
     (InFortCharacter: fort_character).MonitorMovementLoop<private>(InAgent: agent)<suspends>: void =
         OriginalTranslation := InFortCharacter.GetTransform().Translation
@@ -201,8 +133,12 @@ custom_playspace := class<concrete>:
             if ((OriginalX <> CurrentX) or (OriginalY <> CurrentY) or (OriginalZ <> CurrentZ)). break
         InAgent.HandleJoinInProgress()
 
-    (InPlayerSpawner: player_spawner_device).HandleJoinInProgressLoop<private>()<suspends>: void =
-        loop{ InPlayerSpawner.SpawnedEvent.Await().MaybeHandleJoinInProgress() }
-
-    (InTeamSettingsDevice: team_settings_and_inventory_device).HandleJoinInProgressLoop<private>()<suspends>: void =
-        loop{ InTeamSettingsDevice.TeamMemberSpawnedEvent.Await().MaybeHandleJoinInProgress() }
+    (InPlayer: player).HandleLeaveInProgress<private>()<suspends>: void =
+        var Iteration: int = 0
+        loop:
+            if (InPlayer.IsActive[] and Iteration < 40):
+                set Iteration += 1
+                Sleep(0.25)
+            else. break
+        set Self.PlayspacePlayers = Self.PlayspacePlayers.RemoveAllElements(InPlayer)
+        Self.LeaveInProgressEvent.Signal(InPlayer)
